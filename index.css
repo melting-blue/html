@@ -1,0 +1,13 @@
+*{margin: 0; padding: 0;}
+
+#wrap .section:nth-child(1){background-color: midnightblue;}
+#wrap .section:nth-child(1) p{
+   position: absolute;
+   left: 20px;
+   top: 200px;
+   z-index: 1;
+}
+
+#wrap .section img{
+   width: 100%
+}
