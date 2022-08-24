@@ -17,15 +17,15 @@
 
 
 #wrap .slide:nth-child(1){
-   background-image: url(/img/etude1.png);
+   background-image: url(./img/etude1.png);
    background-size: cover;
 }
 #wrap .slide:nth-child(2){
-   background-image: url(/img/etude2.png);
+   background-image: url(./img/etude2.png);
    background-size: cover;
 }
 #wrap .slide:nth-child(3){
-   background-image: url(/img/etude3.png);
+   background-image: url(./img/etude3.png);
    background-size: cover;
 }
 
