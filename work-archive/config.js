@@ -5,5 +5,22 @@ window.WORK_ARCHIVE_CONFIG = {
 window.addEventListener('load',()=>{
   const s=document.createElement('script');
   s.src='./app-patch.js?v=20260910-3';
+  s.onload=()=>{
+    let tries=0;
+    const timer=setInterval(async()=>{
+      tries++;
+      try{
+        if(typeof db!=='undefined'&&db&&typeof user!=='undefined'&&user){
+          clearInterval(timer);
+          const {data,error}=await db.from('leave_records').select('*').order('leave_date',{ascending:false});
+          if(!error){
+            window._waLeaves=data||[];
+            if(typeof renderWeek==='function')renderWeek();
+            if(typeof renderMonth==='function')renderMonth();
+          }
+        }else if(tries>=20){clearInterval(timer)}
+      }catch(e){if(tries>=20)clearInterval(timer)}
+    },250);
+  };
   document.body.appendChild(s);
 });
