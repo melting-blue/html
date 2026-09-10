@@ -4,6 +4,6 @@ window.WORK_ARCHIVE_CONFIG = {
 };
 window.addEventListener('load',()=>{
   const s=document.createElement('script');
-  s.src='./app-patch.js?v=20260910-1';
+  s.src='./app-patch.js?v=20260910-2';
   document.body.appendChild(s);
 });
