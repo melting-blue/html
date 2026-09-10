@@ -3,6 +3,11 @@ window.WORK_ARCHIVE_CONFIG = {
   supabaseAnonKey: 'sb_publishable_d_xuZvGqh1yG9OfVncEiow_W64g_Iai'
 };
 window.addEventListener('load',()=>{
+  const mobile=document.createElement('link');
+  mobile.rel='stylesheet';
+  mobile.href='./mobile.css?v=20260910-1';
+  document.head.appendChild(mobile);
+
   const s=document.createElement('script');
   s.src='./app-patch.js?v=20260910-3';
   s.onload=()=>{
