@@ -1,4 +1,4 @@
 window.WORK_ARCHIVE_CONFIG = {
-  supabaseUrl: '',
+  supabaseUrl: 'https://rkcmdpbrfsewkifskkkq.supabase.co',
   supabaseAnonKey: ''
 };
