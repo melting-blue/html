@@ -11,6 +11,10 @@ window.addEventListener('load',()=>{
   const s=document.createElement('script');
   s.src='./app-patch.js?v=20260910-3';
   s.onload=()=>{
+    const edit=document.createElement('script');
+    edit.src='./edit-patch.js?v=20260910-1';
+    document.body.appendChild(edit);
+
     let tries=0;
     const timer=setInterval(async()=>{
       tries++;
