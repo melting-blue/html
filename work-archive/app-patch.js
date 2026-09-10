@@ -1,8 +1,7 @@
-// Work Archive live patch: project grouping + annual leave + duplicate guards
+// Work Archive live patch: project grouping + inline annual leave + duplicate guards
 (() => {
   const splitProjects = (p='') => String(p).split(/\s*[·/]\s*/).map(x=>x.trim()).filter(Boolean);
 
-  // Project inference: Todayhouse event names are projects in their own right.
   window._waInferProjectBase = typeof inferProject === 'function' ? inferProject : null;
   inferProject = function(t){
     const s=String(t||''); const hits=[];
@@ -16,7 +15,6 @@
     return window._waInferProjectBase ? window._waInferProjectBase(t) : '기타 업무';
   };
 
-  // One task can belong to multiple named projects without creating duplicate DB rows.
   renderProjects = function(){
     const q=normalize($('projectQuery').value), groups={};
     state.tasks.forEach(t=>[...new Set(splitProjects(t.project||'기타 업무'))].forEach(p=>(groups[p]??=[]).push(t)));
@@ -31,7 +29,6 @@
     $('projectDialog').showModal();
   };
 
-  // Remove exact duplicate task lines inside one pasted report while preserving raw_text.
   if(typeof parseReport === 'function'){
     const baseParseReport=parseReport;
     parseReport=function(raw,year){
@@ -41,38 +38,110 @@
     };
   }
 
-  // Annual leave UI.
-  const nav=document.querySelector('.nav');
-  if(nav && !document.querySelector('[data-page="leave"]')){
-    const dataBtn=nav.querySelector('[data-page="data"]');
-    const b=document.createElement('button');b.dataset.page='leave';b.textContent='연차';nav.insertBefore(b,dataBtn||null);
-    const main=document.querySelector('main.main');
-    const sec=document.createElement('section');sec.className='page';sec.id='leave';
-    sec.innerHTML=`<div class="topbar"><div class="title"><h1>연차</h1><p>연차와 반차를 업무기록과 분리해서 날짜별로 기록합니다.</p></div></div>
-      <div class="data-grid" style="margin-bottom:14px"><div class="data-card"><h3>연차 기록 추가</h3><div class="toolbar" style="margin:0"><input id="leaveDate" type="date" style="min-width:150px"><select id="leaveType"><option>연차</option><option>오전반차</option><option>오후반차</option><option>기타</option></select><input id="leaveNote" placeholder="메모 (선택)" style="min-width:180px"><button class="btn primary" id="saveLeaveBtn">저장</button></div></div><div class="data-card"><h3>연도별 사용</h3><div class="toolbar" style="margin:0"><select id="leaveYear"></select><strong id="leaveSummary" style="font-size:13px"></strong></div></div></div>
-      <div class="table-wrap"><table><thead><tr><th>날짜</th><th>유형</th><th>일수</th><th>메모</th><th></th></tr></thead><tbody id="leaveBody"></tbody></table></div>`;
-    main.appendChild(sec);
-    const style=document.createElement('style');style.textContent='.leave-badge,.cal-leave{background:#fff1f7;color:#b36f8d}.leave-badge{display:inline-block;margin-top:7px;padding:4px 7px;border-radius:999px;font-size:9px;font-weight:900}.cal-leave{margin-top:6px;padding:4px 6px;border-radius:6px;font-size:9px;font-weight:850}.btn.mini{padding:5px 8px;font-size:9px}';document.head.appendChild(style);
+  const style=document.createElement('style');
+  style.textContent=`
+    .leave-open{background:var(--pink-soft)!important;color:#ad6c89!important;border-color:#f2c4d7!important}
+    .leave-card{border:1px solid #f3c9da;border-left:4px solid var(--pink);border-radius:12px;padding:9px 10px;background:var(--pink-soft);color:#9f5f7c}
+    .leave-card strong{display:block;font-size:10.5px;margin-bottom:2px}.leave-card span{font-size:9.5px;color:#b47a93}
+    .cal-leave{margin-top:5px;padding:4px 6px;border-radius:6px;background:var(--pink-soft);color:#aa6986;font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .leave-form{display:grid;grid-template-columns:1.2fr 1fr;gap:10px}.leave-form label{font-size:10px;color:#8391a9;font-weight:800}.leave-form input,.leave-form select{width:100%;margin-top:5px;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;outline:none}.leave-form .wide{grid-column:1/-1}
+    .leave-summary{margin:13px 0 8px;font-size:10px;color:#7f8da5}.leave-list{border-top:1px solid var(--line);margin-top:12px;padding-top:10px;display:grid;gap:7px}.leave-row{display:grid;grid-template-columns:82px 90px 1fr auto;gap:8px;align-items:center;font-size:10px}.leave-row .muted{color:#8f9db4}.btn.mini{padding:5px 8px;font-size:9px}
+    @media(max-width:650px){.leave-form{grid-template-columns:1fr}.leave-form .wide{grid-column:auto}.leave-row{grid-template-columns:72px 78px 1fr}.leave-row button{grid-column:3;justify-self:end}}
+  `;
+  document.head.appendChild(style);
 
-    const curYear=new Date().getFullYear();$('leaveYear').innerHTML=Array.from({length:6},(_,i)=>curYear-i).map(y=>`<option value="${y}">${y}</option>`).join('');$('leaveDate').value=iso(new Date());
-    b.onclick=()=>{document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='leave'));loadLeaves()};
-    $('leaveYear').onchange=()=>renderLeaves(window._waLeaves||[]);
-    $('saveLeaveBtn').onclick=saveLeave;
+  const leaveDialog=document.createElement('dialog');
+  leaveDialog.id='leaveDialog';
+  leaveDialog.innerHTML=`<div class="modal"><div class="modal-head"><div><h2>연차 등록</h2><div class="modal-sub">연차/반차는 업무와 분리해서 저장하고 캘린더에 표시합니다.</div></div><button class="close" id="closeLeaveDialog">×</button></div>
+    <div class="leave-form">
+      <label>날짜<input id="leaveDate" type="date"></label>
+      <label>유형<select id="leaveType"><option>연차</option><option>오전반차</option><option>오후반차</option><option>기타</option></select></label>
+      <label class="wide">메모<input id="leaveNote" placeholder="선택"></label>
+    </div>
+    <div class="actions"><button class="btn primary" id="saveLeaveBtn">저장</button></div>
+    <div class="leave-summary" id="leaveSummary"></div><div class="leave-list" id="leaveList"></div>
+  </div>`;
+  document.body.appendChild(leaveDialog);
+  $('closeLeaveDialog').onclick=()=>leaveDialog.close();
+  $('leaveDate').value=iso(new Date());
+  $('saveLeaveBtn').onclick=saveLeave;
+
+  function addLeaveButton(container){
+    if(!container || container.querySelector('.leave-open'))return;
+    const b=document.createElement('button');b.className='btn leave-open';b.textContent='+ 연차';b.onclick=()=>openLeaveDialog();
+    const reportBtn=container.querySelector('.open-report');
+    if(reportBtn)container.insertBefore(b,reportBtn); else container.appendChild(b);
   }
+  addLeaveButton(document.querySelector('#week .top-actions'));
+  addLeaveButton(document.querySelector('#month .topbar'));
 
   async function loadLeaves(){
-    if(!db||!user)return;const {data,error}=await db.from('leave_records').select('*').order('leave_date',{ascending:false});if(error){alert('연차 불러오기 실패: '+error.message);return}window._waLeaves=(data||[]);renderLeaves(window._waLeaves);
+    if(!db||!user)return;
+    const {data,error}=await db.from('leave_records').select('*').order('leave_date',{ascending:false});
+    if(error){console.error('leave load',error);return}
+    window._waLeaves=(data||[]);
+    renderLeaveList();
+    try{renderWeek()}catch(e){}
+    try{renderMonth()}catch(e){}
   }
-  function renderLeaves(rows){
-    if(!$('leaveBody'))return;const y=Number($('leaveYear').value||new Date().getFullYear());const list=rows.filter(l=>Number(l.leave_date.slice(0,4))===y);const used=list.reduce((s,l)=>s+Number(l.amount||0),0);$('leaveSummary').textContent=`${y}년 ${list.length}건 · 사용 ${String(used).replace(/\.0$/,'')}일`;
-    $('leaveBody').innerHTML=list.length?list.map(l=>`<tr><td>${fmtDate(l.leave_date)}</td><td>${esc(l.leave_type)}</td><td>${Number(l.amount)}</td><td>${esc(l.note||'')}</td><td><button class="btn mini leave-delete" data-id="${l.id}">삭제</button></td></tr>`).join(''):'<tr><td colspan="5" class="empty">연차 기록이 없습니다.</td></tr>';
-    document.querySelectorAll('.leave-delete').forEach(x=>x.onclick=async()=>{if(!confirm('이 연차 기록을 삭제할까요?'))return;const {error}=await db.from('leave_records').delete().eq('id',x.dataset.id);if(error)return alert(error.message);toast('연차 기록 삭제 완료');loadLeaves()});
+  function leaveForDate(date){return (window._waLeaves||[]).find(l=>l.leave_date===date)||null}
+  function leaveLabel(l){return l?`${l.leave_type}${l.note?` · ${l.note}`:''}`:''}
+  function renderLeaveList(){
+    if(!$('leaveList'))return;
+    const rows=window._waLeaves||[]; const y=new Date().getFullYear(); const current=rows.filter(l=>l.leave_date.startsWith(String(y))); const used=current.reduce((s,l)=>s+Number(l.amount||0),0);
+    $('leaveSummary').textContent=`${y}년 사용 ${used}일 · ${current.length}건`;
+    const recent=rows.slice(0,8);
+    $('leaveList').innerHTML=recent.length?recent.map(l=>`<div class="leave-row"><span>${fmtDate(l.leave_date).slice(5)}</span><strong>${esc(l.leave_type)}</strong><span class="muted">${esc(l.note||'')}</span><button class="btn mini leave-delete" data-id="${l.id}">삭제</button></div>`).join(''):'<div class="empty" style="padding:14px">연차 기록이 없습니다.</div>';
+    document.querySelectorAll('.leave-delete').forEach(x=>x.onclick=async()=>{if(!confirm('이 연차 기록을 삭제할까요?'))return;const {error}=await db.from('leave_records').delete().eq('id',x.dataset.id);if(error)return alert(error.message);toast('연차 기록 삭제 완료');await loadLeaves()});
   }
+  function openLeaveDialog(date){
+    $('leaveDate').value=date||iso(new Date());
+    const existing=leaveForDate($('leaveDate').value);
+    $('leaveType').value=existing?.leave_type||'연차';$('leaveNote').value=existing?.note||'';
+    renderLeaveList();leaveDialog.showModal();
+  }
+  $('leaveDate').onchange=()=>{const l=leaveForDate($('leaveDate').value);$('leaveType').value=l?.leave_type||'연차';$('leaveNote').value=l?.note||''};
   async function saveLeave(){
-    if(!user)return alert('접속 인증이 필요합니다.');const date=$('leaveDate').value,type=$('leaveType').value,note=$('leaveNote').value.trim();if(!date)return alert('날짜를 선택해 주세요.');const amount=(type==='오전반차'||type==='오후반차')?0.5:1;
-    const {data:old}=await db.from('leave_records').select('id').eq('leave_date',date).limit(1);let res;if(old&&old[0])res=await db.from('leave_records').update({leave_type:type,amount,note}).eq('id',old[0].id);else res=await db.from('leave_records').insert({user_id:user.id,leave_date:date,leave_type:type,amount,note});if(res.error)return alert('연차 저장 실패: '+res.error.message);$('leaveNote').value='';toast(old&&old[0]?'연차 기록 수정 완료':'연차 기록 저장 완료');loadLeaves();
+    if(!user)return alert('접속 인증이 필요합니다.');
+    const date=$('leaveDate').value,type=$('leaveType').value,note=$('leaveNote').value.trim();if(!date)return alert('날짜를 선택해 주세요.');
+    const amount=(type==='오전반차'||type==='오후반차')?0.5:1;
+    const existing=leaveForDate(date);let res;
+    if(existing)res=await db.from('leave_records').update({leave_type:type,amount,note}).eq('id',existing.id);
+    else res=await db.from('leave_records').insert({user_id:user.id,leave_date:date,leave_type:type,amount,note});
+    if(res.error)return alert('연차 저장 실패: '+res.error.message);
+    toast(existing?'연차 기록 수정 완료':'연차 기록 저장 완료');await loadLeaves();leaveDialog.close();
   }
 
-  // Refresh project page now that grouping rules changed.
+  const baseRenderWeek=renderWeek;
+  renderWeek=function(){
+    baseRenderWeek();
+    document.querySelectorAll('#weekGrid .day-col').forEach((col,i)=>{
+      const date=iso(addDays(weekCursor,i)),l=leaveForDate(date);if(!l)return;
+      const body=col.querySelector('.day-body'); if(!body)return;
+      const el=document.createElement('div');el.className='leave-card';el.innerHTML=`<strong>${esc(l.leave_type)}</strong>${l.note?`<span>${esc(l.note)}</span>`:''}`;body.prepend(el);
+      const count=col.querySelector('.day-count');if(count)count.textContent=(count.textContent?count.textContent+' · ':'')+l.leave_type;
+    });
+  };
+
+  const baseRenderMonth=renderMonth;
+  renderMonth=function(){
+    baseRenderMonth();
+    document.querySelectorAll('#calendar .cal-day[data-date]').forEach(cell=>{const l=leaveForDate(cell.dataset.date);if(!l)return;const lines=cell.querySelector('.cal-lines')||cell;const el=document.createElement('div');el.className='cal-leave';el.textContent=leaveLabel(l);lines.prepend(el)});
+  };
+
+  const baseShowDay=showDay;
+  showDay=function(date){
+    baseShowDay(date);
+    const l=leaveForDate(date);if(!l)return;
+    const wrap=$('dayItems');if(!wrap)return;
+    const el=document.createElement('div');el.className='leave-card';el.style.marginBottom='8px';el.innerHTML=`<strong>${esc(l.leave_type)}</strong>${l.note?`<span>${esc(l.note)}</span>`:''}`;wrap.prepend(el);
+  };
+
+  if(typeof afterAuth==='function'){
+    const baseAfterAuth=afterAuth;
+    afterAuth=async function(){await baseAfterAuth();await loadLeaves()};
+  }
+  if(db&&user)loadLeaves();
+
   try{renderProjects()}catch(e){console.warn(e)}
 })();
