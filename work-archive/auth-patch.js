@@ -1,7 +1,8 @@
-// Work Archive auth patch: email + password login, no magic-link emails.
+// Work Archive auth patch: password login + secure one-time password setup.
 (() => {
   const $id = (id) => document.getElementById(id);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const ACCOUNT_EMAIL = 'ssodam.work@gmail.com';
 
   const style = document.createElement('style');
   style.textContent = `
@@ -12,6 +13,10 @@
     #waPasswordBtn{white-space:nowrap}
     .wa-password-form{display:grid;gap:10px}
     .wa-password-form input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fff;outline:none}
+    .wa-setup-card{display:grid;gap:10px;margin-top:14px}
+    .wa-setup-card label{font-size:10px;color:#8391a9;font-weight:800}
+    .wa-setup-card input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fff;outline:none}
+    .wa-setup-email{padding:10px 12px;border-radius:11px;background:#f7f9fd;color:#71809c;font-size:11px}
     @media(max-width:700px){#waPasswordBtn{grid-column:1/-1;width:100%}}
   `;
   document.head.appendChild(style);
@@ -32,6 +37,12 @@
     return msg;
   }
 
+  async function signIn(email, password){
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if(error) throw error;
+    localStorage.setItem('wa-login-email', email);
+  }
+
   function setupLoginUI(){
     const shell = $id('authShell');
     const card = shell?.querySelector('.auth-card');
@@ -39,8 +50,20 @@
     const btn = $id('authBtn');
     if(!card || !email || !btn) return;
 
+    const setupToken = new URLSearchParams(location.search).get('setup');
+    if(setupToken){
+      renderOneTimeSetup(card, setupToken);
+      return;
+    }
+
     const desc = card.querySelector('p');
     if(desc) desc.textContent = '메일 인증 없이 이메일과 비밀번호로 바로 접속합니다. 로그인 상태는 이 기기에 계속 유지됩니다.';
+
+    card.querySelector('#waOneTimeSetup')?.remove();
+    email.closest('label')?.classList?.remove('hidden');
+    email.style.display = '';
+    const originalLabel = [...card.querySelectorAll('label')].find(l=>l.textContent?.includes('내 이메일'));
+    if(originalLabel) originalLabel.style.display='';
 
     let wrap = $id('waAuthPasswordWrap');
     if(!wrap){
@@ -50,6 +73,7 @@
       wrap.innerHTML = '<label for="waAuthPassword">비밀번호</label><input type="password" id="waAuthPassword" autocomplete="current-password" placeholder="비밀번호">';
       email.insertAdjacentElement('afterend', wrap);
     }
+    wrap.style.display='';
 
     const help = card.querySelector('.auth-help');
     if(help){
@@ -60,8 +84,9 @@
     if(setupNote) setupNote.hidden = true;
 
     const saved = localStorage.getItem('wa-login-email');
-    if(saved && !email.value) email.value = saved;
+    email.value = saved || email.value || ACCOUNT_EMAIL;
 
+    btn.style.display='';
     btn.textContent = '로그인';
     btn.disabled = false;
     btn.onclick = async () => {
@@ -72,19 +97,77 @@
       btn.disabled = true;
       btn.textContent = '접속 중…';
       try{
-        const { error } = await db.auth.signInWithPassword({ email:e, password:p });
-        if(error) return alert(humanAuthError(error));
-        localStorage.setItem('wa-login-email', e);
+        await signIn(e,p);
         if($id('waAuthPassword')) $id('waAuthPassword').value = '';
-      } finally {
+      }catch(error){
+        alert(humanAuthError(error));
+      }finally{
         btn.disabled = false;
         btn.textContent = '로그인';
       }
     };
 
     const enter = (ev) => { if(ev.key === 'Enter') btn.click(); };
-    email.addEventListener('keydown', enter);
-    $id('waAuthPassword')?.addEventListener('keydown', enter);
+    email.onkeydown = enter;
+    if($id('waAuthPassword')) $id('waAuthPassword').onkeydown = enter;
+  }
+
+  function renderOneTimeSetup(card, token){
+    const desc = card.querySelector('p');
+    if(desc) desc.textContent = '새 비밀번호를 한 번만 설정하면 앞으로 메일 없이 로그인할 수 있습니다.';
+
+    const email = $id('authEmail');
+    const btn = $id('authBtn');
+    const emailLabel = [...card.querySelectorAll('label')].find(l=>l.textContent?.includes('내 이메일'));
+    if(emailLabel) emailLabel.style.display='none';
+    if(email) email.style.display='none';
+    if($id('waAuthPasswordWrap')) $id('waAuthPasswordWrap').style.display='none';
+    if(btn) btn.style.display='none';
+    if($id('setupNote')) $id('setupNote').hidden=true;
+    const help=card.querySelector('.auth-help'); if(help) help.style.display='none';
+
+    let box=$id('waOneTimeSetup');
+    if(!box){
+      box=document.createElement('div');
+      box.id='waOneTimeSetup';
+      box.className='wa-setup-card';
+      box.innerHTML=`
+        <div class="wa-setup-email">${ACCOUNT_EMAIL}</div>
+        <label for="waSetupPassword">새 비밀번호</label>
+        <input type="password" id="waSetupPassword" autocomplete="new-password" placeholder="8자 이상">
+        <label for="waSetupPassword2">새 비밀번호 확인</label>
+        <input type="password" id="waSetupPassword2" autocomplete="new-password" placeholder="한 번 더 입력">
+        <button class="btn primary" id="waSetupPasswordBtn" type="button">비밀번호 설정하고 로그인</button>
+        <div class="wa-auth-note">이 설정 링크는 한 번만 사용할 수 있고 잠시 후 만료됩니다.</div>`;
+      card.appendChild(box);
+    }
+
+    const action=$id('waSetupPasswordBtn');
+    action.onclick=async()=>{
+      const p1=$id('waSetupPassword').value;
+      const p2=$id('waSetupPassword2').value;
+      if(p1.length<8) return alert('비밀번호를 8자 이상으로 설정해 주세요.');
+      if(p1!==p2) return alert('비밀번호 확인이 일치하지 않습니다.');
+      action.disabled=true; action.textContent='설정 중…';
+      try{
+        const cfg=window.WORK_ARCHIVE_CONFIG||{};
+        const res=await fetch(`${cfg.supabaseUrl}/functions/v1/set-work-archive-password`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':cfg.supabaseAnonKey},
+          body:JSON.stringify({token,password:p1})
+        });
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.error||'비밀번호 설정에 실패했습니다.');
+        history.replaceState({},'',location.pathname);
+        await signIn(ACCOUNT_EMAIL,p1);
+        $id('waSetupPassword').value='';$id('waSetupPassword2').value='';
+      }catch(error){
+        alert(humanAuthError(error));
+        action.disabled=false; action.textContent='비밀번호 설정하고 로그인';
+      }
+    };
+    const enter=(ev)=>{if(ev.key==='Enter')action.click()};
+    $id('waSetupPassword').onkeydown=enter;$id('waSetupPassword2').onkeydown=enter;
   }
 
   function ensurePasswordDialog(){
@@ -143,7 +226,6 @@
     setupLoginUI();
     ensurePasswordDialog();
 
-    // If already signed in, expose a one-time password setup/change action.
     for(let i=0;i<80;i++){
       if(typeof user !== 'undefined' && user){ ensurePasswordButton(); break; }
       await sleep(100);
