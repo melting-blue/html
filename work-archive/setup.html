@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f7fbff">
+<title>WORK ARCHIVE · 비밀번호 설정</title>
+<style>
+:root{--bg:#f7fbff;--ink:#26344f;--muted:#8190aa;--line:#dfe8f5;--blue:#78aef8;--lav:#b8aaf4}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,sans-serif;background:linear-gradient(135deg,#f8fbff,#f6f2ff 55%,#fff5f9);color:var(--ink)}
+body{display:grid;place-items:center;padding:18px;min-height:100vh}.card{width:min(560px,94vw);background:rgba(255,255,255,.96);border:1px solid #dce6f3;border-radius:24px;padding:28px;box-shadow:0 28px 80px rgba(91,116,163,.16)}h1{margin:0;font-size:28px;letter-spacing:-.045em}.desc{font-size:13px;line-height:1.65;color:#8795ad;margin:12px 0 18px}.email{padding:11px 12px;border-radius:11px;background:#f7f9fd;color:#71809c;font-size:13px;margin-bottom:14px}.field{margin-top:12px}.field label{display:block;font-size:11px;color:#8391a9;font-weight:800;margin-bottom:7px}.field input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:#fff;outline:none;font-size:15px}.field input:focus{border-color:#9fc4fa;box-shadow:0 0 0 3px rgba(117,169,249,.10)}button{width:100%;margin-top:16px;border:0;border-radius:12px;padding:12px 14px;min-height:48px;font:inherit;font-weight:850;color:white;background:linear-gradient(135deg,#7aacf4,#a7a1f1);cursor:pointer;box-shadow:0 8px 20px rgba(117,169,249,.22)}button:disabled{opacity:.65;cursor:default}.note{margin-top:12px;font-size:10.5px;line-height:1.55;color:#98a4b7}.error{display:none;margin-top:13px;padding:10px 12px;border-radius:11px;background:#fff1f4;color:#a94d65;font-size:12px;line-height:1.5}.success{display:none;margin-top:13px;padding:10px 12px;border-radius:11px;background:#edf6ff;color:#5078ad;font-size:12px;line-height:1.5}@media(max-width:650px){body{align-items:start;padding-top:8vh}.card{padding:22px 18px;border-radius:20px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>WORK ARCHIVE</h1>
+    <div class="desc">새 비밀번호를 한 번만 설정하면 앞으로 인증 메일 없이 로그인할 수 있습니다.</div>
+    <div class="email">ssodam.work@gmail.com</div>
+    <div class="field"><label for="pw1">새 비밀번호</label><input id="pw1" type="password" autocomplete="new-password" placeholder="8자 이상"></div>
+    <div class="field"><label for="pw2">새 비밀번호 확인</label><input id="pw2" type="password" autocomplete="new-password" placeholder="한 번 더 입력"></div>
+    <button id="save" type="button">비밀번호 설정</button>
+    <div id="error" class="error"></div>
+    <div id="success" class="success">비밀번호가 설정되었습니다. 잠시 후 기존 기록으로 이동합니다.</div>
+    <div class="note">이 페이지는 1회용 설정 링크로만 동작합니다. 비밀번호는 GitHub 코드에 저장되지 않습니다.</div>
+  </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL='https://rkcmdpbrfsewkifskkkq.supabase.co';
+const SUPABASE_KEY='sb_publishable_d_xuZvGqh1yG9OfVncEiow_W64g_Iai';
+const ACCOUNT_EMAIL='ssodam.work@gmail.com';
+const params=new URLSearchParams(location.search);
+const token=params.get('setup')||params.get('token');
+const btn=document.getElementById('save');
+const err=document.getElementById('error');
+const ok=document.getElementById('success');
+function showError(msg){err.textContent=msg;err.style.display='block';ok.style.display='none'}
+if(!token){showError('설정 토큰이 없습니다. 새 설정 링크가 필요합니다.');btn.disabled=true}
+btn.onclick=async()=>{
+  const p1=document.getElementById('pw1').value;
+  const p2=document.getElementById('pw2').value;
+  err.style.display='none';
+  if(p1.length<8)return showError('비밀번호를 8자 이상으로 설정해 주세요.');
+  if(p1!==p2)return showError('비밀번호 확인이 일치하지 않습니다.');
+  btn.disabled=true;btn.textContent='설정 중…';
+  try{
+    const res=await fetch(SUPABASE_URL+'/functions/v1/set-work-archive-password',{
+      method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({token,password:p1})
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok)throw new Error(data.error||'비밀번호 설정에 실패했습니다.');
+    const client=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+    const {error:loginError}=await client.auth.signInWithPassword({email:ACCOUNT_EMAIL,password:p1});
+    if(loginError)throw loginError;
+    ok.style.display='block';
+    history.replaceState({},'',location.pathname);
+    setTimeout(()=>location.href='./',900);
+  }catch(e){showError(e.message||'비밀번호 설정에 실패했습니다.');btn.disabled=false;btn.textContent='비밀번호 설정'}
+};
+[pw1,pw2].forEach(el=>el.onkeydown=e=>{if(e.key==='Enter')btn.click()});
+</script>
+</body>
+</html>
