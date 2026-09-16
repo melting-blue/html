@@ -16,7 +16,7 @@ window.addEventListener('load',()=>{
     document.body.appendChild(edit);
 
     const auth=document.createElement('script');
-    auth.src='./auth-patch.js?v=20260916-1';
+    auth.src='./auth-patch.js?v=20260916-2';
     document.body.appendChild(auth);
 
     let tries=0;
