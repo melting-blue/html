@@ -15,6 +15,10 @@ window.addEventListener('load',()=>{
     edit.src='./edit-patch.js?v=20260910-1';
     document.body.appendChild(edit);
 
+    const auth=document.createElement('script');
+    auth.src='./auth-patch.js?v=20260916-1';
+    document.body.appendChild(auth);
+
     let tries=0;
     const timer=setInterval(async()=>{
       tries++;
