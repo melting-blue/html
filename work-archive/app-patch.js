@@ -1,11 +1,12 @@
 // Work Archive live patch: project grouping + inline leave + Korean holidays + duplicate guards
 (() => {
-  const splitProjects = (p='') => String(p).split(/\s*[·/]\s*/).map(x=>x.trim()).filter(Boolean);
+  const splitProjects = (p='',t='') => explicitProject(t)?[explicitProject(t)]:String(p).split(/\s*[·/]\s*/).map(x=>x.trim()).filter(Boolean);
   const holidayMap = new Map();
   let holidaysReady = false;
 
   window._waInferProjectBase = typeof inferProject === 'function' ? inferProject : null;
   inferProject = function(t){
+    const explicit=explicitProject(t);if(explicit)return explicit;
     const s=String(t||''); const hits=[];
     if(/집요한\s*세일/i.test(s)) hits.push('집요한세일');
     if(/스페셜딜/i.test(s)) hits.push('스페셜딜');
@@ -18,14 +19,14 @@
   };
 
   renderProjects = function(){
-    const q=normalize($('projectQuery').value), groups={};
-    state.tasks.forEach(t=>[...new Set(splitProjects(t.project||'기타 업무'))].forEach(p=>(groups[p]??=[]).push(t)));
+    const q=normalize($('projectQuery').value), groups=Object.create(null);
+    state.tasks.forEach(t=>[...new Set(splitProjects(t.project||'기타 업무',t.task))].forEach(p=>(groups[p]??=[]).push(t)));
     const arr=Object.entries(groups).filter(([p])=>!q||normalize(p).includes(q)).sort((a,b)=>b[1].length-a[1].length);
     $('projectList').innerHTML=arr.length?arr.map(([p,tasks])=>{const dates=tasks.map(t=>t.date).sort();return `<button class="project-card" data-project="${esc(p)}"><h3>${esc(p)}</h3><div class="project-count">${tasks.length}</div><p>${fmtDate(dates[0])} — ${fmtDate(dates[dates.length-1])}</p></button>`}).join(''):'<div class="empty">프로젝트가 없습니다.</div>';
     document.querySelectorAll('.project-card').forEach(el=>el.onclick=()=>showProject(el.dataset.project));
   };
   showProject = function(project){
-    const tasks=state.tasks.filter(t=>splitProjects(t.project).includes(project)).sort((a,b)=>a.date.localeCompare(b.date));
+    const tasks=state.tasks.filter(t=>splitProjects(t.project,t.task).includes(project)).sort((a,b)=>a.date.localeCompare(b.date));
     $('projectTitle').textContent=project;$('projectSub').textContent=`${tasks.length}개 기록`;
     $('projectTimeline').innerHTML=tasks.map(t=>`<div style="display:grid;grid-template-columns:105px 1fr;gap:12px;margin-bottom:8px"><div style="font-size:10px;color:#8b99b0;padding-top:10px">${fmtDate(t.date)}</div><div class="work-item"><div class="work-text">${esc(t.task)}</div></div></div>`).join('');
     $('projectDialog').showModal();
