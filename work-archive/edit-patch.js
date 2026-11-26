@@ -1,6 +1,6 @@
 // Work Archive: edit/delete uploaded work records while keeping raw report text in sync.
 (() => {
-  const splitProjectTokens=(p='')=>String(p).split(/\s*[·/]\s*/).map(x=>x.trim()).filter(Boolean);
+  const splitProjectTokens=(p='',t='')=>explicitProject(t)?[explicitProject(t)]:String(p).split(/\s*[·/]\s*/).map(x=>x.trim()).filter(Boolean);
 
   const style=document.createElement('style');
   style.textContent=`
@@ -79,7 +79,7 @@
 
   async function saveTaskEdit(){
     const t=taskById(editingTaskId);if(!t)return;
-    const text=$('waEditText').value.trim(),project=$('waEditProject').value.trim()||inferProject(text);
+    const text=$('waEditText').value.trim(),project=explicitProject(text)||$('waEditProject').value.trim()||inferProject(text);
     if(!text)return alert('업무 내용을 입력해 주세요.');
     const report=reportById(t.reportId),newRaw=report?editRawTask(report.raw,t.task,text):null;
     $('waSaveTask').disabled=true;$('waSaveTask').textContent='저장 중…';let backup=null;
@@ -133,7 +133,7 @@
     }
   }
   function bindProject(project){
-    const tasks=state.tasks.filter(t=>splitProjectTokens(t.project).includes(project)).sort((a,b)=>a.date.localeCompare(b.date));markItems([...document.querySelectorAll('#projectTimeline .work-item')],tasks)
+    const tasks=state.tasks.filter(t=>splitProjectTokens(t.project,t.task).includes(project)).sort((a,b)=>a.date.localeCompare(b.date));markItems([...document.querySelectorAll('#projectTimeline .work-item')],tasks)
   }
   function bindSearch(){
     const q=normalize($('searchQuery').value),type=$('typeFilter').value;
