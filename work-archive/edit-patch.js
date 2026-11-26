@@ -79,7 +79,7 @@
 
   async function saveTaskEdit(){
     const t=taskById(editingTaskId);if(!t)return;
-    const text=$('waEditText').value.trim().replace(/콘티넨탈/g,'컨티넨탈'),project=explicitProject(text)||canonicalProject($('waEditProject').value.trim())||inferProject(text);
+    const text=$('waEditText').value.trim().replace(/콘티넨탈/g,'컨티넨탈').replace(/박스[ \t]+누끼/g,'박스누끼'),project=explicitProject(text)||canonicalProject($('waEditProject').value.trim())||inferProject(text);
     if(!text)return alert('업무 내용을 입력해 주세요.');
     const report=reportById(t.reportId),newRaw=report?editRawTask(report.raw,t.task,text):null;
     $('waSaveTask').disabled=true;$('waSaveTask').textContent='저장 중…';let backup=null;
