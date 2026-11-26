@@ -12,7 +12,7 @@ window.addEventListener('load',()=>{
   s.src='./app-patch.js?v=20261126-1';
   s.onload=()=>{
     const edit=document.createElement('script');
-    edit.src='./edit-patch.js?v=20261126-1';
+    edit.src='./edit-patch.js?v=20261126-2';
     document.body.appendChild(edit);
 
     const auth=document.createElement('script');
