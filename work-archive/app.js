@@ -71,7 +71,7 @@ function extractDateFromHeader(line,year){
 function isRealReportHeader(line){return /소담\s*업무보고/.test(line)&&!/—/.test(line)}
 function splitReportChunks(raw){const lines=raw.split(/\r?\n/),chunks=[];let cur=[];for(const line of lines){if(isRealReportHeader(line)&&cur.some(x=>x.trim())){chunks.push(cur.join('\n').trim());cur=[line]}else cur.push(line)}if(cur.some(x=>x.trim()))chunks.push(cur.join('\n').trim());return chunks.filter(c=>/소담\s*업무보고/.test(c))}
 function parseReport(raw,year){
-  raw=raw.replace(/콘티넨탈/g,'컨티넨탈');
+  raw=raw.replace(/콘티넨탈/g,'컨티넨탈').replace(/박스[ \t]+누끼/g,'박스누끼');
   const lines=raw.split(/\r?\n/);const h=lines.findIndex(isRealReportHeader);if(h<0)return null;const date=extractDateFromHeader(lines[h],year);if(!date)return null;const tasks=[];
   for(let i=h+1;i<lines.length;i++){
     const trim=lines[i].trim();if(!trim)continue;if(/—/.test(trim)&&/업무보고/.test(trim))continue;if(/^✅\s*완료/.test(trim)||/^🔄\s*진행/.test(trim)||/^📋\s*예정/.test(trim)||/^🚧/.test(trim)||/^#+\s*/.test(trim))continue;
