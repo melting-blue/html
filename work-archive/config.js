@@ -9,10 +9,10 @@ window.addEventListener('load',()=>{
   document.head.appendChild(mobile);
 
   const s=document.createElement('script');
-  s.src='./app-patch.js?v=20260910-3';
+  s.src='./app-patch.js?v=20261126-1';
   s.onload=()=>{
     const edit=document.createElement('script');
-    edit.src='./edit-patch.js?v=20260910-1';
+    edit.src='./edit-patch.js?v=20261126-1';
     document.body.appendChild(edit);
 
     const auth=document.createElement('script');
