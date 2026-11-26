@@ -47,16 +47,20 @@ function inferCollab(t){
   for(const re of patterns){let m;while((m=re.exec(t)))out.push(m[1].trim())}
   return [...new Set(out)].join(', ');
 }
-function explicitProject(t){const m=String(t??'').match(/^\s*\[([^\]\r\n]+)\]/);return m?m[1].trim():'';}
+function canonicalProject(p){
+  const aliases={'컨티넨탈':'컨티넨탈 리클라이너','컨티넨탈 합성':'컨티넨탈 리클라이너','코니엘':'코니엘데이베드','코니엘 데이베드':'코니엘데이베드','코니엘 AI라이브영상제작':'코니엘데이베드','벨라':'벨라 식탁세트','헤일리':'헤일리 수납침대','쿠팡용 헤일리':'헤일리 수납침대','헤일리 쿠팡용':'헤일리 수납침대','디오니':'디오니 수납침대','올시즌':'올시즌 매트리스','헬레네':'헬레네 식탁세트','시에나':'시에나 리클라이너','에르고':'에르고 리클라이너','아틀란':'아틀란 리클라이너'};
+  return String(p??'').replace(/콘티넨탈/g,'컨티넨탈').replace(/체어/g,'의자').replace(/식탁\s+세트/g,'식탁세트').replace(/식탁$/,'식탁세트').split(/\s*·\s*/).map(x=>{x=x.trim();return Object.prototype.hasOwnProperty.call(aliases,x)?aliases[x]:x}).join(' · ');
+}
+function explicitProject(t){const m=String(t??'').match(/^\s*\[([^\]\r\n]+)\]/);return m?canonicalProject(m[1].trim()):'';}
 function inferProject(t){
   const explicit=explicitProject(t);if(explicit)return explicit;
-  const s=String(t);
+  const s=String(t).replace(/콘티넨탈/g,'컨티넨탈');
   const known=['컨티넨탈','보이저 신형','보이저 프로','보이저','코니엘 데이베드','코니엘','헬레네','디오니','데네브','오르트','이클립스','베스퍼','지젤','이음','라이즈','뉴포트 유로탑','뉴포트 필로우탑','뉴포트 스탠다드','뉴포트','스파인코어','크루저','에르고','아틀란','시에나','룬덴','헤일리','코트니','클레어','데바','로프트','라일라','말론','틸다','그루터','세라믹','방수커버','매트리스 방수커버','니오','오슬로','엘든','린델','크리스','허쉬','리브','미쉘','루나','마리안','에이바','올시즌','다니','플러피','브리즈','벨라','하모니','지노','앤틀러스','루미에르','뉴도로모','도로모','로빈','카푸','프라제르','네티','로미','뮤즈화이트','상판만','보니애','오늘의집'];
   const hits=known.filter(k=>s.toLowerCase().includes(k.toLowerCase()));
-  if(hits.length){const unique=hits.filter((k,i)=>!hits.some((x,j)=>j!==i&&x.includes(k)&&x.length>k.length)).slice(0,3);return unique.join(' · ')}
+  if(hits.length){const unique=hits.filter((k,i)=>!hits.some((x,j)=>j!==i&&x.includes(k)&&x.length>k.length)).slice(0,3);return canonicalProject(unique.join(' · '))}
   let p=s.replace(/^[-•·*]\s*/,'').split(/\s*[>→]\s*/)[0].trim().replace(/\([^\)]*\)/g,'').trim();
   const cuts=[' 상세',' 이미지',' 배너',' 초안',' 썸네일',' 옵션',' 파일',' 내용',' 파트',' 관련',' 수정',' 변경',' 보정',' 생성',' 작업',' 기획',' 자료',' 인증'];let idx=p.length;cuts.forEach(c=>{const i=p.indexOf(c);if(i>0)idx=Math.min(idx,i)});p=p.slice(0,idx).trim();
-  return p.length>=2&&p.length<=36?p:'기타 업무';
+  return p.length>=2&&p.length<=36?canonicalProject(p):'기타 업무';
 }
 function extractDateFromHeader(line,year){
   let m=line.match(/(?:(20\d{2})[.\/-]\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일/);if(m)return `${m[1]||year}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
@@ -67,6 +71,7 @@ function extractDateFromHeader(line,year){
 function isRealReportHeader(line){return /소담\s*업무보고/.test(line)&&!/—/.test(line)}
 function splitReportChunks(raw){const lines=raw.split(/\r?\n/),chunks=[];let cur=[];for(const line of lines){if(isRealReportHeader(line)&&cur.some(x=>x.trim())){chunks.push(cur.join('\n').trim());cur=[line]}else cur.push(line)}if(cur.some(x=>x.trim()))chunks.push(cur.join('\n').trim());return chunks.filter(c=>/소담\s*업무보고/.test(c))}
 function parseReport(raw,year){
+  raw=raw.replace(/콘티넨탈/g,'컨티넨탈');
   const lines=raw.split(/\r?\n/);const h=lines.findIndex(isRealReportHeader);if(h<0)return null;const date=extractDateFromHeader(lines[h],year);if(!date)return null;const tasks=[];
   for(let i=h+1;i<lines.length;i++){
     const trim=lines[i].trim();if(!trim)continue;if(/—/.test(trim)&&/업무보고/.test(trim))continue;if(/^✅\s*완료/.test(trim)||/^🔄\s*진행/.test(trim)||/^📋\s*예정/.test(trim)||/^🚧/.test(trim)||/^#+\s*/.test(trim))continue;
