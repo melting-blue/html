@@ -47,7 +47,9 @@ function inferCollab(t){
   for(const re of patterns){let m;while((m=re.exec(t)))out.push(m[1].trim())}
   return [...new Set(out)].join(', ');
 }
+function explicitProject(t){const m=String(t??'').match(/^\s*\[([^\]\r\n]+)\]/);return m?m[1].trim():'';}
 function inferProject(t){
+  const explicit=explicitProject(t);if(explicit)return explicit;
   const s=String(t);
   const known=['컨티넨탈','보이저 신형','보이저 프로','보이저','코니엘 데이베드','코니엘','헬레네','디오니','데네브','오르트','이클립스','베스퍼','지젤','이음','라이즈','뉴포트 유로탑','뉴포트 필로우탑','뉴포트 스탠다드','뉴포트','스파인코어','크루저','에르고','아틀란','시에나','룬덴','헤일리','코트니','클레어','데바','로프트','라일라','말론','틸다','그루터','세라믹','방수커버','매트리스 방수커버','니오','오슬로','엘든','린델','크리스','허쉬','리브','미쉘','루나','마리안','에이바','올시즌','다니','플러피','브리즈','벨라','하모니','지노','앤틀러스','루미에르','뉴도로모','도로모','로빈','카푸','프라제르','네티','로미','뮤즈화이트','상판만','보니애','오늘의집'];
   const hits=known.filter(k=>s.toLowerCase().includes(k.toLowerCase()));
